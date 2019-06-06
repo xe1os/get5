@@ -158,7 +158,7 @@ bool g_TeamGivenStopCommand[MatchTeam_Count];
 bool g_InExtendedPause;
 int g_TeamPauseTimeUsed[MatchTeam_Count];
 int g_TeamPausesUsed[MatchTeam_Count];
-int g_ReadyTimeWaitingUsed[MatchTeam_Count];
+int g_ReadyTimeWaitingUsed = 0;
 char g_DefaultTeamColors[][] = {
     TEAM1_COLOR, TEAM2_COLOR, "{NORMAL}", "{NORMAL}",
 };
@@ -607,7 +607,7 @@ public void OnMapStart() {
     g_TeamReadyForUnpause[team] = false;
     g_TeamPauseTimeUsed[team] = 0;
     g_TeamPausesUsed[team] = 0;
-    g_ReadyTimeWaitingUsed[team] = 0;
+    g_ReadyTimeWaitingUsed = 0;
   }
 
   if (g_WaitingForRoundBackup) {
@@ -686,24 +686,37 @@ public Action Timer_CheckReady(Handle timer) {
 
 static void CheckReadyWaitingTimes() {
   if (g_TeamTimeToStartCvar.IntValue > 0) {
-    CheckReadyWaitingTime(MatchTeam_Team1);
-    CheckReadyWaitingTime(MatchTeam_Team2);
+    g_ReadyTimeWaitingUsed++;
+
+    bool team1Forfeited = CheckReadyWaitingTime(MatchTeam_Team1);
+    bool team2Forfeited = CheckReadyWaitingTime(MatchTeam_Team2);
+
+    if (team1Forfeited && team2Forfeited) {
+      g_ForcedWinner = MatchTeam_TeamNone;
+      Stats_Forfeit(MatchTeam_TeamNone);
+    } else if (team1Forfeited) {
+      g_ForcedWinner = MatchTeam_Team2;
+      Stats_Forfeit(MatchTeam_Team1);
+    } else if (team2Forfeited) {
+      g_ForcedWinner = MatchTeam_Team1;
+      Stats_Forfeit(MatchTeam_Team2);
+    }
+
+    if (team1Forfeited || team2Forfeited) {
+      g_ForceWinnerSignal = true;
+      ChangeState(Get5State_None);
+      EndSeries();
+    }
   }
 }
 
-static void CheckReadyWaitingTime(MatchTeam team) {
+static bool CheckReadyWaitingTime(MatchTeam team) {
   if (!IsTeamReady(team) && g_GameState != Get5State_None) {
-    g_ReadyTimeWaitingUsed[team]++;
-    int timeLeft = g_TeamTimeToStartCvar.IntValue - g_ReadyTimeWaitingUsed[team];
+    int timeLeft = g_TeamTimeToStartCvar.IntValue - g_ReadyTimeWaitingUsed;
 
     if (timeLeft <= 0) {
-      g_ForceWinnerSignal = true;
-      g_ForcedWinner = (team == MatchTeam_Team1) ? MatchTeam_Team2 : MatchTeam_Team1;
       Get5_MessageToAll("%t", "TeamForfeitInfoMessage", g_FormattedTeamNames[team]);
-      ChangeState(Get5State_None);
-      Stats_Forfeit(team);
-      EndSeries();
-
+      return true;
     } else if (timeLeft >= 300 && timeLeft % 60 == 0) {
       Get5_MessageToAll("%t", "MinutesToForfeitMessage", g_FormattedTeamNames[team], timeLeft / 60);
 
@@ -715,6 +728,7 @@ static void CheckReadyWaitingTime(MatchTeam team) {
                         timeLeft);
     }
   }
+  return false;
 }
 
 static void CheckAutoLoadConfig() {
@@ -740,14 +754,21 @@ public Action Command_EndMatch(int client, int args) {
   g_MapChangePending = false;
   char mapName[PLATFORM_MAX_PATH];
   GetCleanMapName(mapName, sizeof(mapName));
+  int team1score = CS_GetTeamScore(MatchTeamToCSTeam(MatchTeam_Team1));
+  int team2score = CS_GetTeamScore(MatchTeamToCSTeam(MatchTeam_Team2));
+  LogDebug("Calling Get5_OnMapResult(map=%s, winner=%d, team1score=%d, team2score=%d, mapnum=%d)",
+           mapName, MatchTeam_TeamNone, team1score, team2score, GetMapNumber() - 1);
   Call_StartForward(g_OnMapResult);
   Call_PushString(mapName);
   Call_PushCell(MatchTeam_TeamNone);
-  Call_PushCell(CS_GetTeamScore(MatchTeamToCSTeam(MatchTeam_Team1)));
-  Call_PushCell(CS_GetTeamScore(MatchTeamToCSTeam(MatchTeam_Team2)));
+  Call_PushCell(team1score);
+  Call_PushCell(team2score);
   Call_PushCell(GetMapNumber() - 1);
   Call_Finish();
 
+  LogDebug("Calling Get5_OnSeriesResult(winner=%d, team1_series_score=%d, team2_series_score=%d)",
+           MatchTeam_TeamNone, g_TeamSeriesScores[MatchTeam_Team1],
+           g_TeamSeriesScores[MatchTeam_Team2]);
   Call_StartForward(g_OnSeriesResult);
   Call_PushCell(MatchTeam_TeamNone);
   Call_PushCell(g_TeamSeriesScores[MatchTeam_Team1]);
@@ -917,12 +938,16 @@ public Action Event_MatchOver(Event event, const char[] name, bool dontBroadcast
 
     char mapName[PLATFORM_MAX_PATH];
     GetCleanMapName(mapName, sizeof(mapName));
+    int team1score = CS_GetTeamScore(MatchTeamToCSTeam(MatchTeam_Team1));
+    int team2score = CS_GetTeamScore(MatchTeamToCSTeam(MatchTeam_Team2));
 
+    LogDebug("Calling Get5_OnMapResult(map=%s, winner=%d, team1score=%d, team2score=%d, mapnum=%d)",
+             mapName, winningTeam, team1score, team2score, GetMapNumber() - 1);
     Call_StartForward(g_OnMapResult);
     Call_PushString(mapName);
     Call_PushCell(winningTeam);
-    Call_PushCell(CS_GetTeamScore(MatchTeamToCSTeam(MatchTeam_Team1)));
-    Call_PushCell(CS_GetTeamScore(MatchTeamToCSTeam(MatchTeam_Team2)));
+    Call_PushCell(team1score);
+    Call_PushCell(team2score);
     Call_PushCell(GetMapNumber() - 1);
     Call_Finish();
 
@@ -1051,6 +1076,7 @@ public void EndSeries() {
   Stats_SeriesEnd(winningTeam);
   EventLogger_SeriesEnd(winningTeam, t1maps, t2maps);
 
+  LogDebug("Calling Get5_OnSeriesResult(winner=%d, t1maps=%d, t2maps=%d)", winningTeam, t1maps, t2maps);
   Call_StartForward(g_OnSeriesResult);
   Call_PushCell(winningTeam);
   Call_PushCell(t1maps);
@@ -1158,6 +1184,8 @@ public Action Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
                       g_TeamNames[MatchTeam_Team2]);
 
     Stats_RoundEnd(csTeamWinner);
+
+    LogDebug("Calling Get5_OnRoundStatsUpdated");
     Call_StartForward(g_OnRoundStatsUpdated);
     Call_Finish();
 
@@ -1270,8 +1298,8 @@ public Action StopDemo(Handle timer) {
 }
 
 public void ChangeState(Get5State state) {
-  LogDebug("Change from state %d -> %d", g_GameState, state);
   g_GameStateCvar.IntValue = view_as<int>(state);
+  LogDebug("Get5_OnGameStateChanged(from=%d, to=%d)", g_GameState, state);
   Call_StartForward(g_OnGameStateChanged);
   Call_PushCell(g_GameState);
   Call_PushCell(state);

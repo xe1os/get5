@@ -1,5 +1,4 @@
-#define EventLogger_StartEvent() \
-  JSON_Object params = new JSON_Object()
+#define EventLogger_StartEvent() JSON_Object params = new JSON_Object()
 
 #define EventLogger_EndEvent(%1) EventLogger_LogEvent(%1, params)
 
@@ -7,7 +6,7 @@ static void EventLogger_LogEvent(const char[] eventName, JSON_Object params) {
   // Handle json = json_object();
   JSON_Object json = new JSON_Object();
   json.SetString("event", eventName);
-  json.SetString("matchid`", g_MatchID);
+  json.SetString("matchid", g_MatchID);
   json.SetObject("params", params);
 
   const int kMaxCharacters = 1000;
@@ -26,6 +25,7 @@ static void EventLogger_LogEvent(const char[] eventName, JSON_Object params) {
       LogToFileEx(logPath, buffer);
     }
 
+    LogDebug("Calling Get5_OnEvent(event name = %s)", eventName);
     Call_StartForward(g_OnEvent);
     Call_PushString(buffer);
     Call_Finish();

@@ -22,10 +22,10 @@ stock bool LoadMatchConfig(const char[] config, bool restoreBackup = false) {
     g_TeamGivenStopCommand[team] = false;
     g_TeamPauseTimeUsed[team] = 0;
     g_TeamPausesUsed[team] = 0;
-    g_ReadyTimeWaitingUsed[team] = 0;
     ClearArray(GetTeamAuths(team));
   }
 
+  g_ReadyTimeWaitingUsed = 0;
   g_ForceWinnerSignal = false;
   g_ForcedWinner = MatchTeam_TeamNone;
 
@@ -113,6 +113,8 @@ stock bool LoadMatchConfig(const char[] config, bool restoreBackup = false) {
 
     EventLogger_SeriesStart();
     Stats_InitSeries();
+
+    LogDebug("Calling Get5_OnSeriesInit");
     Call_StartForward(g_OnSeriesInit);
     Call_Finish();
   }
@@ -137,6 +139,7 @@ stock bool LoadMatchConfig(const char[] config, bool restoreBackup = false) {
 }
 
 public bool LoadMatchFile(const char[] config) {
+  LogDebug("Calling Get5_OnPreLoadMatchConfig(config=%s)", config);
   Call_StartForward(g_OnPreLoadMatchConfig);
   Call_PushString(config);
   Call_Finish();
@@ -186,6 +189,7 @@ static void MatchConfigFail(const char[] reason, any...) {
 
   EventLogger_MatchConfigFail(buffer);
 
+  LogDebug("Calling Get5_OnLoadMatchConfigFailed(reason=%s)", buffer);
   Call_StartForward(g_OnLoadMatchConfigFailed);
   Call_PushString(buffer);
   Call_Finish();
@@ -536,11 +540,15 @@ static bool LoadMatchFromJson(JSON_Object json) {
     StringMapSnapshot snap = cvars.Snapshot();
     for (int i = 0; i < snap.Length; i++) {
       snap.GetKey(i, cvarName, sizeof(cvarName));
+      // Skip json meta keys.
+      if (json_is_meta_key(cvarName)) {
+        continue;
+      }
+
       cvars.GetString(cvarName, cvarValue, sizeof(cvarValue));
       g_CvarNames.PushString(cvarName);
       g_CvarValues.PushString(cvarValue);
     }
-
   }
 
   return true;

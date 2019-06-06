@@ -145,6 +145,7 @@ public int Native_SetPlayerName(Handle plugin, int numParams) {
   ConvertAuthToSteam64(auth, steam64);
   if (strlen(name) > 0 && !StrEqual(name, KEYVALUE_STRING_PLACEHOLDER)) {
     g_PlayerNames.SetString(steam64, name);
+    LoadPlayerNames();
   }
 }
 
