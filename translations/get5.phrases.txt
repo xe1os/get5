@@ -2,24 +2,24 @@
 {
     "ReadyToVetoInfoMessage"
     {
-        "en"            "Type {GREEN}!ready {NORMAL}when your team is ready to veto."
+        "en"            "Type {GREEN}.ready {NORMAL}when your team is ready to veto."
     }
     "WaitingForCastersReadyInfoMessage"
     {
         "#format"       "{1:s}"
-        "en"            "Waiting for {1} to type {GREEN}!ready {NORMAL}to begin."
+        "en"            "Waiting for {1} to type {GREEN}.ready {NORMAL}to begin."
     }
     "ReadyToRestoreBackupInfoMessage"
     {
-        "en"            "Type {GREEN}!ready {NORMAL}when you are ready to restore the match backup."
+        "en"            "Type {GREEN}.ready {NORMAL}when you are ready to restore the match backup."
     }
     "ReadyToKnifeInfoMessage"
     {
-        "en"            "Type {GREEN}!ready {NORMAL}when you are ready to knife."
+        "en"            "Type {GREEN}.ready {NORMAL}when you are ready to knife."
     }
     "ReadyToStartInfoMessage"
     {
-        "en"            "Type {GREEN}!ready {NORMAL}when you are ready to begin."
+        "en"            "Type {GREEN}.ready {NORMAL}when you are ready to begin."
     }
     "YouAreReady"
     {
@@ -32,7 +32,7 @@
     "WaitingForEnemySwapInfoMessage"
     {
         "#format"       "{1:s}"
-        "en"            "{1} won the knife round. Waiting for them to type !stay or !swap."
+        "en"            "{1} won the knife round. Waiting for them to type {GREEN}.stay or {GREEN}.swap"
     }
     "WaitingForGOTVBrodcastEndingInfoMessage"
     {
@@ -125,7 +125,7 @@
     "WaitingForUnpauseInfoMessage"
     {
         "#format"       "{1:s},{2:s}"
-        "en"            "{1} wants to unpause, waiting for {2} to type !unpause."
+        "en"            "{1} wants to unpause, waiting for {2} to type {GREEN}.unpause"
     }
     "PausesLeftInfoMessage"
     {
@@ -170,7 +170,7 @@
     "ForceReadyInfoMessage"
     {
         "#format"       "{1:d}"
-        "en"            "You may type {GREEN}!forceready {NORMAL}to force ready your team if you have less than {GREEN}{1}{NORMAL} players."
+        "en"            "You may type {GREEN}.forceready {NORMAL}to force ready your team if you have less than {GREEN}{1}{NORMAL} players."
     }
     "TeammateForceReadied"
     {
@@ -196,7 +196,7 @@
     "TeamWantsToReloadLastRoundInfoMessage"
     {
         "#format"       "{1:s},{2:s}"
-        "en"            "{1} wants to stop and reload last round, need {2} to confirm with !stop."
+        "en"            "{1} wants to stop and reload last round, need {2} to confirm with {GREEN}.stop"
     }
     "TeamWinningSeriesInfoMessage"
     {
@@ -314,7 +314,7 @@
     }
     "ReadyToResumeVetoInfoMessage"
     {
-        "en"            "Type {GREEN}!ready {NORMAL}when you are ready to resume the veto."
+        "en"            "Type {GREEN}.ready {NORMAL}when you are ready to resume the veto."
     }
     "MatchConfigLoadedInfoMessage"
     {
@@ -326,15 +326,15 @@
     }
     "ReadyTag"
     {
-        "en"            "[READY]"
+        "en"            ""
     }
     "NotReadyTag"
     {
-        "en"            "[NOT READY]"
+        "en"            ""
     }
     "MatchPoweredBy"
     {
-        "en"        "Powered by {YELLOW}Get5"
+        "en"        "{YELLOW}GL & HF"
     }
     "MapVetoPickMenuText"
     {
