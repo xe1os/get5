@@ -1,3 +1,5 @@
+#include <string>
+
 #define REMOTE_CONFIG_PATTERN "remote_config%d.json"
 #define CONFIG_MATCHID_DEFAULT "matchid"
 #define CONFIG_MATCHTITLE_DEFAULT "Map {MAPNUMBER} of {MAXMAPS}"
@@ -199,14 +201,15 @@ stock bool LoadMatchFromUrl(const char[] url, ArrayList paramNames = null,
                             ArrayList paramValues = null) {
   bool steamWorksAvaliable = LibraryExists("SteamWorks");
 
+
   char cleanedUrl[1024];
   strcopy(cleanedUrl, sizeof(cleanedUrl), url);
   ReplaceString(cleanedUrl, sizeof(cleanedUrl), "\"", "");
+  strcopy(g_LoadedConfigUrl, sizeof(g_LoadedConfigUrl), cleanedUrl);
 
   if (steamWorksAvaliable) {
-    // Add the protocl strings. Only allow http since SteamWorks doesn't support http it seems?
-    ReplaceString(cleanedUrl, sizeof(cleanedUrl), "https://", "http://");
-    if (StrContains(cleanedUrl, "http://") == -1) {
+    // Add the protocol strings if missing (only http).
+    if (StrContains(cleanedUrl, "http://") == -1 && StrContains(cleanedUrl, "https://") == -1) {
       Format(cleanedUrl, sizeof(cleanedUrl), "http://%s", cleanedUrl);
     }
     LogDebug("cleanedUrl (SteamWorks) = %s", cleanedUrl);
@@ -253,6 +256,8 @@ public int SteamWorks_OnMatchConfigReceived(Handle request, bool failure, bool r
   GetTempFilePath(remoteConfig, sizeof(remoteConfig), REMOTE_CONFIG_PATTERN);
   SteamWorks_WriteHTTPResponseBodyToFile(request, remoteConfig);
   LoadMatchConfig(remoteConfig);
+
+  strcopy(g_LoadedConfigFile, sizeof(g_LoadedConfigFile), g_LoadedConfigUrl);
 }
 
 public void WriteMatchToKv(KeyValues kv) {
@@ -515,20 +520,17 @@ static bool LoadMatchFromJson(JSON_Object json) {
   }
 
   if (g_SkipVeto) {
-    JSON_Object array = json.GetObject("map_sides");
+    JSON_Array array = view_as<JSON_Array>(json.GetObject("map_sides"));
     if (array != null) {
       if (!array.IsArray) {
         MatchConfigFail("Expected \"map_sides\" section to be an array");
         return false;
       }
       for (int i = 0; i < array.Length; i++) {
-        char keyAsString[64];
         char buffer[64];
-        array.GetIndexString(keyAsString, sizeof(keyAsString), i);
-        array.GetString(keyAsString, buffer, sizeof(buffer));
+        array.GetString(i, buffer, sizeof(buffer));
         g_MapSides.Push(SideTypeFromString(buffer));
       }
-      CloseHandle(array);
     }
   }
 
@@ -620,6 +622,16 @@ static void LoadDefaultMapList(ArrayList list) {
   list.PushString("de_nuke");
   list.PushString("de_overpass");
   list.PushString("de_train");
+  
+  if (g_SkipVeto) {
+    char currentMap[PLATFORM_MAX_PATH];
+    GetCurrentMap(currentMap, sizeof(currentMap));
+
+    int currentMapIndex = list.FindString(currentMap);
+    if (currentMapIndex > 0) {
+      list.SwapAt(0, currentMapIndex);
+    }
+  }
 }
 
 public void SetMatchTeamCvars() {
