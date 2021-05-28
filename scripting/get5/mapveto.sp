@@ -290,7 +290,7 @@ public int MapVetoMenuHandler(Menu menu, MenuAction action, int param1, int para
     g_LastVetoTeam = team;
 
   } else if (action == MenuAction_Cancel) {
-    if(g_GameState == Get5State_Veto) {
+    if (g_GameState == Get5State_Veto) {
       AbortVeto();
     }
 
@@ -357,7 +357,7 @@ public int MapPickMenuHandler(Menu menu, MenuAction action, int param1, int para
     VetoController(GetNextTeamCaptain(client));
 
   } else if (action == MenuAction_Cancel) {
-    if(g_GameState == Get5State_Veto) {
+    if (g_GameState == Get5State_Veto) {
       AbortVeto();
     }
 
@@ -432,7 +432,7 @@ public int SidePickMenuHandler(Menu menu, MenuAction action, int param1, int par
     VetoController(client);
 
   } else if (action == MenuAction_Cancel) {
-    if(g_GameState == Get5State_Veto) {
+    if (g_GameState == Get5State_Veto) {
       AbortVeto();
     }
 

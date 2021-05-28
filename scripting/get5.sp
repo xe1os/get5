@@ -51,6 +51,7 @@
 /** ConVar handles **/
 ConVar g_AllowTechPauseCvar;
 ConVar g_AutoLoadConfigCvar;
+ConVar g_AutoReadyActivePlayers;
 ConVar g_BackupSystemEnabledCvar;
 ConVar g_CheckAuthsCvar;
 ConVar g_DamagePrintCvar;
@@ -165,8 +166,13 @@ int g_TeamPauseTimeUsed[MATCHTEAM_COUNT];
 int g_TeamPausesUsed[MATCHTEAM_COUNT];
 int g_ReadyTimeWaitingUsed = 0;
 char g_DefaultTeamColors[][] = {
-    TEAM1_COLOR, TEAM2_COLOR, "{NORMAL}", "{NORMAL}",
+    TEAM1_COLOR,
+    TEAM2_COLOR,
+    "{NORMAL}",
+    "{NORMAL}",
 };
+
+char g_LastKickedPlayerAuth[64];
 
 bool g_ForceWinnerSignal = false;
 MatchTeam g_ForcedWinner = MatchTeam_TeamNone;
@@ -254,6 +260,9 @@ public void OnPluginStart() {
   g_AutoLoadConfigCvar =
       CreateConVar("get5_autoload_config", "",
                    "Name of a match config file to automatically load when the server loads");
+  g_AutoReadyActivePlayers = CreateConVar(
+      "get5_auto_ready_active_players", "0",
+      "Whether to automatically mark players as ready if they kill anyone in the warmup or veto phase.");
   g_BackupSystemEnabledCvar =
       CreateConVar("get5_backup_system_enabled", "1", "Whether the get5 backup system is enabled");
   g_DamagePrintCvar =
@@ -283,7 +292,7 @@ public void OnPluginStart() {
       "get5_kick_immunity", "1",
       "Whether or not admins with the changemap flag will be immune to kicks from \"get5_kick_when_no_match_loaded\". Set to \"0\" to disable");
   g_KickClientsWithNoMatchCvar =
-      CreateConVar("get5_kick_when_no_match_loaded", "1",
+      CreateConVar("get5_kick_when_no_match_loaded", "0",
                    "Whether the plugin kicks new clients when no match is loaded");
   g_LiveCfgCvar =
       CreateConVar("get5_live_cfg", "get5/live.cfg", "Config file to exec when the game goes live");
@@ -369,6 +378,8 @@ public void OnPluginStart() {
                     "Elects to stay on the current team after winning a knife round");
   AddAliasedCommand("swap", Command_Swap,
                     "Elects to swap the current teams after winning a knife round");
+  AddAliasedCommand("switch", Command_Swap,
+                    "Elects to swap the current teams after winning a knife round");
   AddAliasedCommand("t", Command_T, "Elects to start on T side after winning a knife round");
   AddAliasedCommand("ct", Command_Ct, "Elects to start on CT side after winning a knife round");
   AddAliasedCommand("stop", Command_Stop, "Elects to stop the game to reload a backup file");
@@ -387,6 +398,10 @@ public void OnPluginStart() {
               "Adds a steamid to a match team");
   RegAdminCmd("get5_removeplayer", Command_RemovePlayer, ADMFLAG_CHANGEMAP,
               "Removes a steamid from a match team");
+  RegAdminCmd("get5_addkickedplayer", Command_AddKickedPlayer, ADMFLAG_CHANGEMAP,
+              "Adds the last kicked steamid to a match team");
+  RegAdminCmd("get5_removekickedplayer", Command_RemoveKickedPlayer, ADMFLAG_CHANGEMAP,
+              "Removes the last kicked steamid from a match team");
   RegAdminCmd("get5_creatematch", Command_CreateMatch, ADMFLAG_CHANGEMAP,
               "Creates and loads a match using the players currently on the server as a Bo1");
 
@@ -540,7 +555,7 @@ public void OnClientAuthorized(int client, const char[] auth) {
   if (g_GameState != Get5State_None && g_CheckAuthsCvar.BoolValue) {
     MatchTeam team = GetClientMatchTeam(client);
     if (team == MatchTeam_TeamNone) {
-      KickClient(client, "%t", "YourAreNotAPlayerInfoMessage");
+      RememberAndKickClient(client, "%t", "YourAreNotAPlayerInfoMessage");
     } else {
       int teamCount = CountPlayersOnMatchTeam(team, client);
       if (teamCount >= g_PlayersPerTeam && !g_CoachingEnabledCvar.BoolValue) {
@@ -548,6 +563,11 @@ public void OnClientAuthorized(int client, const char[] auth) {
       }
     }
   }
+}
+
+public void RememberAndKickClient(int client, const char[] format, const char[] translationPhrase) {
+  GetAuth(client, g_LastKickedPlayerAuth, sizeof(g_LastKickedPlayerAuth));
+  KickClient(client, format, translationPhrase);
 }
 
 public void OnClientPutInServer(int client) {
@@ -780,7 +800,8 @@ public Action Command_EndMatch(int client, int args) {
   Call_PushCell(GetMapNumber() - 1);
   Call_Finish();
 
-  EventLogger_SeriesCancel(g_TeamSeriesScores[MatchTeam_Team1], g_TeamSeriesScores[MatchTeam_Team2]);
+  EventLogger_SeriesCancel(g_TeamSeriesScores[MatchTeam_Team1],
+                           g_TeamSeriesScores[MatchTeam_Team2]);
   LogDebug("Calling Get5_OnSeriesResult(winner=%d, team1_series_score=%d, team2_series_score=%d)",
            MatchTeam_TeamNone, g_TeamSeriesScores[MatchTeam_Team1],
            g_TeamSeriesScores[MatchTeam_Team2]);
@@ -790,8 +811,8 @@ public Action Command_EndMatch(int client, int args) {
   Call_PushCell(g_TeamSeriesScores[MatchTeam_Team2]);
   Call_Finish();
 
-  UpdateClanTags();
   ChangeState(Get5State_None);
+  UpdateClanTags();
 
   Get5_MessageToAll("%t", "AdminForceEndInfoMessage");
   RestoreCvars(g_MatchConfigChangedCvars);
@@ -837,6 +858,8 @@ public Action Command_LoadMatchUrl(int client, int args) {
     if (args >= 1 && GetCmdArgString(arg, sizeof(arg))) {
       if (!LoadMatchFromUrl(arg)) {
         ReplyToCommand(client, "Failed to load match config.");
+      } else {
+        ReplyToCommand(client, "Match config loading initialized.");
       }
     } else {
       ReplyToCommand(client, "Usage: get5_loadmatch_url <url>");
@@ -1064,9 +1087,8 @@ public Action Timer_NextMatchMap(Handle timer) {
 public void KickClientsOnEnd() {
   if (g_KickClientsWithNoMatchCvar.BoolValue) {
     for (int i = 1; i <= MaxClients; i++) {
-      if (IsPlayer(i) &&
-          !(g_KickClientImmunity.BoolValue &&
-            CheckCommandAccess(i, "get5_kickcheck", ADMFLAG_CHANGEMAP))) {
+      if (IsPlayer(i) && !(g_KickClientImmunity.BoolValue &&
+                           CheckCommandAccess(i, "get5_kickcheck", ADMFLAG_CHANGEMAP))) {
         KickClient(i, "%t", "MatchFinishedInfoMessage");
       }
     }

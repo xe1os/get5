@@ -67,6 +67,10 @@ public bool IsTeamReady(MatchTeam team) {
   int playerCount = GetTeamPlayerCount(team);
   int readyCount = GetTeamReadyCount(team);
 
+  if (team == MatchTeam_TeamSpec && minReady == 0) {
+    return true;
+  }
+
   if (playerCount == readyCount && playerCount >= minPlayers) {
     return true;
   }
@@ -135,21 +139,32 @@ public Action Command_AdminForceReady(int client, int args) {
 }
 
 // Client commands
+// Re-used to automatically ready players on warmup-activity, hence the helper-method.
+public void HandleReadyCommand(int client, bool autoReady) {
+  if (!IsReadyGameState()) {
+    return;
+  }
 
-public Action Command_Ready(int client, int args) {
   MatchTeam team = GetClientMatchTeam(client);
-  if (!IsReadyGameState() || team == MatchTeam_TeamNone || IsClientReady(client)) {
-    return Plugin_Handled;
+  if (team == MatchTeam_TeamNone || IsClientReady(client)) {
+    return;
   }
 
   Get5_Message(client, "%t", "YouAreReady");
+
+  if (autoReady) {
+    PrintHintText(client, "%t", "YouAreReadyAuto");
+  }
 
   SetClientReady(client, true);
   if (IsTeamReady(team)) {
     SetMatchTeamCvars();
     HandleReadyMessage(team);
   }
+}
 
+public Action Command_Ready(int client, int args) {
+  HandleReadyCommand(client, false);
   return Plugin_Handled;
 }
 

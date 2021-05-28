@@ -8,6 +8,7 @@ public void Stats_PluginStart() {
   HookEvent("bomb_exploded", Stats_BombExplodedEvent);
   HookEvent("flashbang_detonate", Stats_FlashbangDetonateEvent, EventHookMode_Pre);
   HookEvent("player_blind", Stats_PlayerBlindEvent);
+  HookEvent("round_mvp", Stats_RoundMVPEvent);
 }
 
 public void Stats_Reset() {
@@ -179,12 +180,17 @@ public void Stats_SeriesEnd(MatchTeam winner) {
 }
 
 public Action Stats_PlayerDeathEvent(Event event, const char[] name, bool dontBroadcast) {
-  if (g_GameState != Get5State_Live) {
+  int attacker = GetClientOfUserId(event.GetInt("attacker"));
+
+  if (g_GameState != Get5State_Live || g_DoingBackupRestoreNow) {
+    if (g_AutoReadyActivePlayers.BoolValue) {
+      // HandleReadyCommand checks for game state, so we don't need to do that here as well.
+      HandleReadyCommand(attacker, true);
+    }
     return Plugin_Continue;
   }
 
   int victim = GetClientOfUserId(event.GetInt("userid"));
-  int attacker = GetClientOfUserId(event.GetInt("attacker"));
   int assister = GetClientOfUserId(event.GetInt("assister"));
   bool headshot = event.GetBool("headshot");
 
@@ -196,7 +202,7 @@ public Action Stats_PlayerDeathEvent(Event event, const char[] name, bool dontBr
 
   if (validVictim) {
     IncrementPlayerStat(victim, STAT_DEATHS);
-    
+
     // used for calculating round KAST
     g_PlayerSurvived[victim] = false;
 
@@ -228,7 +234,7 @@ public Action Stats_PlayerDeathEvent(Event event, const char[] name, bool dontBr
 
       if (headshot)
         IncrementPlayerStat(attacker, STAT_HEADSHOT_KILLS);
-      
+
       if (IsValidClient(assister)) {
         IncrementPlayerStat(assister, STAT_ASSISTS);
         g_PlayerRoundKillOrAssistOrTradedDeath[assister] = true;
@@ -388,6 +394,21 @@ public Action Stats_PlayerBlindEvent(Event event, const char[] name, bool dontBr
   int userid = event.GetInt("userid");
   int client = GetClientOfUserId(userid);
   RequestFrame(GetFlashInfo, GetClientSerial(client));
+
+  return Plugin_Continue;
+}
+
+public Action Stats_RoundMVPEvent(Event event, const char[] name, bool dontBroadcast) {
+  if (g_GameState != Get5State_Live) {
+    return Plugin_Continue;
+  }
+
+  int userid = event.GetInt("userid");
+  int client = GetClientOfUserId(userid);
+
+  if (IsValidClient(client)) {
+    IncrementPlayerStat(client, STAT_MVP);
+  }
 
   return Plugin_Continue;
 }

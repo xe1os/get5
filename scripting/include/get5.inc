@@ -136,6 +136,9 @@ native void Get5_GetMatchID(char[] id, int length);
 // Sets the current matchid.
 native void Get5_SetMatchID(const char[] id);
 
+// Returns the server ID as defined by get5_server_id.
+native int Get5_GetServerID();
+
 // Adds a cvar to be set when going live. If the cvar is already in the cvars for the match, the new
 // value will replace the old value if the override parameter is true.
 // Note: this should only be used when a match config loaded.
@@ -195,9 +198,11 @@ native int Get5_IncreasePlayerStat(int client, const char[] statName, int amount
 #define STAT_TRADEKILL "tradekill"
 #define STAT_KAST "kast"
 #define STAT_CONTRIBUTION_SCORE "contribution_score"
+#define STAT_MVP "mvp"
 
 public SharedPlugin __pl_get5 = {
-    name = "get5", file = "get5.smx",
+    name = "get5",
+    file = "get5.smx",
 #if defined REQUIRE_PLUGIN
     required = 1,
 #else
@@ -222,6 +227,7 @@ public __pl_get5_SetNTVOptional() {
   MarkNativeAsOptional("Get5_GetTeamScores");
   MarkNativeAsOptional("Get5_GetMatchID");
   MarkNativeAsOptional("Get5_SetMatchID");
+  MarkNativeAsOptional("Get5_GetServerID");
   MarkNativeAsOptional("Get5_AddLiveCvar");
   MarkNativeAsOptional("Get5_IncreasePlayerStat");
   MarkNativeAsOptional("Get5_GetMatchStats");
